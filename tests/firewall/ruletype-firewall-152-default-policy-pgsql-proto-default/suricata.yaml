@@ -1,0 +1,35 @@
+%YAML 1.1
+---
+
+stats:
+  enabled: yes
+  interval: 8
+
+app-layer:
+  protocols:
+    pgsql:
+      enabled: yes
+
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - stats
+        - flow
+        - alert
+        - pgsql
+        - drop:
+            alerts: yes
+            flows: all
+
+firewall:
+  policies:
+    packet:
+      filter: [ "accept:hook" ]
+    app:
+      pgsql:
+        # Every pgsql hook resolves through this one tier, including the
+        # intermediate progress state that has no config key of its own.
+        default-policy: [ "accept:hook" ]

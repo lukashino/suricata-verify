@@ -1,0 +1,64 @@
+requires:
+  min-version: 9
+
+pcap: ../../pgsql/pgsql-query-keyword-01/input.pcap
+
+args:
+  - --simulate-ips
+  - -k none
+
+checks:
+# No transaction ever completes, so nothing is logged.
+- filter:
+    count: 0
+    match:
+      event_type: pgsql
+# The block is the app-layer default policy, on the first packet with app-layer
+# data - the TCP handshake was already accepted by the packet hooks.
+- filter:
+    count: 1
+    match:
+      event_type: drop
+      pcap_cnt: 4
+      proto: TCP
+      drop.reason: "firewall default app policy"
+- filter:
+    count: 26
+    match:
+      event_type: drop
+      drop.reason: "firewall flow drop"
+- filter:
+    count: 27
+    match:
+      event_type: drop
+# The flow was established and detected as pgsql before being dropped, so the
+# block is not a lower-layer failure.
+- filter:
+    count: 1
+    match:
+      event_type: flow
+      app_proto: pgsql
+      flow.state: established
+      flow.action: drop
+      flow.tx_cnt: 1
+      flow.alerted: false
+- filter:
+    count: 1
+    match:
+      event_type: stats
+      stats.flow.total: 1
+      # pgsql was parsed, so protocol detection and reassembly both worked.
+      stats.app_layer.tx.pgsql: 1
+      # The 3-packet TCP handshake passed the packet hooks.
+      stats.firewall.accepted: 3
+      stats.firewall.blocked: 27
+      stats.firewall.rejected: 0
+      stats.firewall.drop_reason.default_app_policy: 1
+      stats.firewall.drop_reason.flow_drop: 26
+      # No packet-hook policy, stream or parser problem contributed.
+      stats.firewall.drop_reason.default_packet_policy: 0
+      stats.ips.drop_reason.stream_error: 0
+      stats.ips.drop_reason.stream_reassembly: 0
+      stats.ips.drop_reason.stream_midstream: 0
+      stats.ips.drop_reason.applayer_error: 0
+      stats.ips.drop_reason.rules: 0

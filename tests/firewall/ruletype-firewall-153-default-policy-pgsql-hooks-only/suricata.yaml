@@ -1,0 +1,40 @@
+%YAML 1.1
+---
+
+stats:
+  enabled: yes
+  interval: 8
+
+app-layer:
+  protocols:
+    pgsql:
+      enabled: yes
+
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - stats
+        - flow
+        - alert
+        - pgsql
+        - drop:
+            alerts: yes
+            flows: all
+
+firewall:
+  policies:
+    packet:
+      filter: [ "accept:hook" ]
+    app:
+      pgsql:
+        # Only the four addressable (generic) hooks. pgsql registers no state
+        # names, so its intermediate progress state has neither a parser state
+        # name nor a generic alias, and cannot be named here at all. It falls
+        # through to the built-in drop:flow.
+        request-started:   [ "accept:hook" ]
+        request-complete:  [ "accept:hook" ]
+        response-started:  [ "accept:hook" ]
+        response-complete: [ "accept:hook" ]

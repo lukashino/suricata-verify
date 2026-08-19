@@ -1,0 +1,49 @@
+requires:
+  min-version: 9
+
+pcap: ../../pgsql/pgsql-query-keyword-01/input.pcap
+
+args:
+  - --simulate-ips
+  - -k none
+
+checks:
+# Every transaction in the session is parsed and logged.
+- filter:
+    count: 6
+    match:
+      event_type: pgsql
+# A full request/response pair gets through, not just the session setup.
+- filter:
+    count: 1
+    match:
+      event_type: pgsql
+      pgsql.tx_id: 5
+      pgsql.request.simple_query: SELECT 1;
+      pgsql.response.command_completed: SELECT 1
+      pgsql.response.data_rows: 1
+- filter:
+    count: 0
+    match:
+      event_type: drop
+- filter:
+    count: 1
+    match:
+      event_type: flow
+      app_proto: pgsql
+      flow.state: closed
+      flow.tx_cnt: 6
+      flow.alerted: false
+      not-has-key: flow.action
+- filter:
+    count: 1
+    match:
+      event_type: stats
+      stats.flow.total: 1
+      stats.app_layer.tx.pgsql: 6
+      stats.firewall.accepted: 30
+      stats.firewall.blocked: 0
+      stats.firewall.rejected: 0
+      stats.firewall.drop_reason.default_app_policy: 0
+      stats.firewall.drop_reason.default_packet_policy: 0
+      stats.firewall.drop_reason.flow_drop: 0
