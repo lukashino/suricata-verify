@@ -65,5 +65,9 @@ checks:
   # We should not have seen any ICMP echo requests on the server.
   - shell:
       args: |
-        pings=$(jq -c '.[]' ./tshark-server.json|jq 'select(._source.layers.icmp."icmp.type"=="8")'|wc -l)
+        # Validate the capture parses before counting: an empty or truncated
+        # tshark-server.json otherwise reads as "no pings arrived" and the
+        # check passes without having verified anything.
+        jq -e -s 'length == 1 and (.[0] | type == "array")' ./tshark-server.json >/dev/null
+        pings=$(jq '[.[] | select(._source.layers.icmp."icmp.type" == "8")] | length' ./tshark-server.json)
         test "${pings}" -eq 0

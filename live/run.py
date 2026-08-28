@@ -163,8 +163,10 @@ def parse_topology(
             server = ipaddress.ip_interface(raw_network["server"])
         except (TypeError, ValueError) as err:
             raise ValueError(f"{prefix} has an invalid CIDR: {err}") from err
-        if client.version != 4 or server.version != 4:
-            raise ValueError(f"{prefix} only supports IPv4 CIDRs")
+        if client.version != server.version:
+            raise ValueError(
+                f"{prefix} client and server must be the same address family"
+            )
         if client.network != server.network:
             raise ValueError(f"{prefix} client and server must be in the same subnet")
         if client.ip == server.ip:
@@ -479,9 +481,50 @@ def disable_offloads(ns: str, iface: str) -> None:
         ns_run_quiet(ns, ["ethtool", "-K", iface, feature, "off"])
 
 
+# IPv6 stays enabled -- a test can assign addresses and exchange IPv6 traffic.
+# What is switched off is autoconfiguration, which puts packets on the wire at
+# times we do not control and so makes exact packet and verdict counts
+# non-deterministic.
+IPV6_QUIET_CONF = (
+    # The load-bearing one. With no automatic link-local address the interface
+    # joins no multicast groups, so there is nothing to report, solicit or
+    # defend, and it emits nothing at all. A test that wants IPv6 assigns
+    # addresses explicitly, which is what a deterministic test wants anyway.
+    "addr_gen_mode=1",
+    # No router solicitations. These were the worst offenders: up to three per
+    # interface, each after a random delay and then retransmitted on a 4 second
+    # timer, so they landed mid-test and on top of shutdown.
+    "accept_ra=0",
+    "router_solicitations=0",
+    "autoconf=0",
+    # No duplicate address detection probes.
+    "accept_dad=0",
+    "dad_transmits=0",
+    # Assigning an IPv6 address joins a solicited-node group, and that join is
+    # reported twice with a delay drawn at random from this interval (1s by
+    # default). Send them immediately so they land during setup instead of at
+    # some random point after Suricata has started capturing. Measured: this
+    # moves the last such packet from 0.29-0.99s after link-up to ~0.01s.
+    "mldv1_unsolicited_report_interval=0",
+    "mldv2_unsolicited_report_interval=0",
+)
+
+
+def quiet_ipv6(ns: str) -> None:
+    """Silence IPv6 autoconfiguration in a test namespace, without disabling IPv6.
+
+    "default" applies to interfaces added later, so it has to be set before the
+    veths are moved in; "all" covers the interfaces the namespace already has.
+    """
+    for key in ("default", "all"):
+        for conf in IPV6_QUIET_CONF:
+            ns_run_quiet(ns, ["sysctl", "-w", f"net.ipv6.conf.{key}.{conf}"])
+
+
 def setup_namespaces() -> None:
     for ns in ALL_NAMESPACES:
         run(["ip", "netns", "add", ns])
+        quiet_ipv6(ns)
         run(["ip", "-n", ns, "link", "set", "lo", "up"])
         ns_exec(
             ns, ["sysctl", "-w", "net.ipv4.ping_group_range=0 2147483647"], quiet=True
@@ -575,6 +618,7 @@ def topology_root_links(topology: TestTopology) -> tuple[str, ...]:
 def setup_topology_namespaces(topology: TestTopology) -> None:
     for ns in topology_namespaces(topology):
         run(["ip", "netns", "add", ns])
+        quiet_ipv6(ns)
         run(["ip", "-n", ns, "link", "set", "lo", "up"])
         ns_exec(
             ns, ["sysctl", "-w", "net.ipv4.ping_group_range=0 2147483647"], quiet=True
@@ -1574,12 +1618,19 @@ def run_test(
                 failures.append(f"server script exited with code {server_rc}")
                 add_script_log_paths(failures, output_dir, "server")
     finally:
-        if server:
-            log_test_step(environment, test_name, "Stopping Server")
-            server.stop()
+        # Stop Suricata before tearing the server down. Both endpoints are idle
+        # at this point (the client script has returned), so nothing is on the
+        # wire when the capture threads exit. The other order lets container
+        # teardown race the shutdown: the kernel counts whatever lands in the
+        # ring, but the AF_PACKET read loop bails out on suricata_ctl_flags
+        # without draining it, so capture.kernel_packets ends up ahead of the
+        # packets that actually got a verdict.
         if suricata:
             log_test_step(environment, test_name, "Stopping Suricata")
             stop_suricata(suricata)
+        if server:
+            log_test_step(environment, test_name, "Stopping Server")
+            server.stop()
         if stdout_thread:
             stdout_thread.join(timeout=5)
         if stderr_thread:
