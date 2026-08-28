@@ -1,0 +1,1 @@
+drop icmpv6 any any -> any any (itype:128; sid:1; rev:1;)

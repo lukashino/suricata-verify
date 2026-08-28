@@ -1,0 +1,43 @@
+# Exercises IPv6 addressing in the harness end to end, and asserts that with
+# autoconf quiesced the resulting packet counts are exact.
+environment: inline
+
+topology:
+  mtu: 1500
+  networks:
+    - client: 2001:db8::2/64
+      server: 2001:db8::1/64
+
+requires:
+  command:
+    - jq
+    - podman
+
+args:
+  - --af-packet
+  - --runmode workers
+  - -S ${TESTDIR}/icmpv6.rules
+
+before: |
+  podman build --iidfile=${OUTDIR}/client.iid --network=host client
+
+client: |
+  iid=$(cat ${OUTDIR}/client.iid)
+  # ICMPv6 echo requests are dropped inline, so this must fail.
+  if podman run --rm --cap-add=NET_RAW --network ns:/var/run/netns/client0 ${iid} \
+      ping -6 -c 5 -i 0.2 -W 1 2001:db8::1; then
+    echo "error: ping6 should have been dropped"
+    exit 1
+  fi
+
+checks:
+  - filter:
+      count: 5
+      match:
+        alert.signature_id: 1
+
+  - stats:
+      # 5 echo requests + the neighbour solicitation/advertisement pair.
+      decoder.icmpv6: 7
+      decoder.ipv6: 7
+      ips.blocked: 5
