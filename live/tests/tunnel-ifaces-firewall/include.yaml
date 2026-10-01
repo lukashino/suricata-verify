@@ -1,0 +1,50 @@
+%YAML 1.1
+---
+
+default-rule-path: ${TESTDIR}
+rule-files:
+  - empty.rules
+
+firewall:
+  enabled: yes
+  rule-path: ${TESTDIR}
+  rule-files:
+    - firewall.rules
+
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - stats:
+            totals: yes
+            threads: no
+            interval: 1
+
+af-packet:
+  - interface: client0
+    cluster-id: 80
+    copy-mode: ips
+    copy-iface: server0
+  - interface: server0
+    cluster-id: 81
+    copy-mode: ips
+    copy-iface: client0
+  - interface: default
+    defrag: false
+    threads: auto
+    cluster-type: cluster_flow
+
+decoder:
+  vxlan:
+    enabled: true
+  tunnel-ifaces:
+    - client0
+    - server0
+  tunnels:
+    - id: 1
+      type: vxlan
+      src: 10.200.0.2
+      dst: 10.200.0.1
+      session: 123

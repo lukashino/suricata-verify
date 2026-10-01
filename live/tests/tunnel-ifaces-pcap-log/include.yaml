@@ -1,0 +1,41 @@
+%YAML 1.1
+---
+
+default-rule-path: ${TESTDIR}
+rule-files:
+  - icmp.rules
+
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - alert
+        - stats:
+            totals: yes
+            threads: no
+            interval: 1
+        - flow
+  - pcap-log:
+      enabled: yes
+      filename: log.pcap
+      mode: normal
+      conditional: all
+
+decoder:
+  vxlan:
+    enabled: true
+  tunnel-ifaces:
+    - br0
+  tunnels:
+    - id: 1
+      type: vxlan
+      src: 10.200.0.2
+      dst: 10.200.0.1
+      session: 123
+    - id: 1
+      type: vxlan
+      src: 10.200.0.1
+      dst: 10.200.0.2
+      session: 123

@@ -1,0 +1,2 @@
+# Accept ARP only: ICMP hits the default drop policy when the firewall evaluates it.
+accept:packet arp:all any any -> any any (sid:100;)

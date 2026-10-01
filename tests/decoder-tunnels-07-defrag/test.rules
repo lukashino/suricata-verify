@@ -1,0 +1,2 @@
+alert udp any any -> any any (content:"AAAAAAAA"; dsize:>2000; sid:1;)
+alert udp any any -> any any (content:"BBBBBBBB"; dsize:>2000; sid:2;)

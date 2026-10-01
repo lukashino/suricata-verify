@@ -1,0 +1,38 @@
+requires:
+  min-version: 9
+
+args:
+  - --set decoder.vxlan.enabled=true
+
+checks:
+  - filter:
+      count: 1
+      match:
+        event_type: flow
+        proto: ICMP
+        tunnel_id: 2
+        flow.pkts_toserver: 1
+  - filter:
+      count: 1
+      match:
+        event_type: alert
+        tunnel_id: 2
+  - filter:
+      count: 2
+      match:
+        event_type: alert
+        alert.signature_id: 1
+        not-has-key: tunnel_id
+  # both unknown tunnels get PKT_TUNNEL_UNKNOWN, so their inner flows merge
+  - filter:
+      count: 1
+      match:
+        event_type: flow
+        proto: ICMP
+        flow.pkts_toserver: 2
+        not-has-key: tunnel_id
+  - filter:
+      count: 2
+      match:
+        event_type: flow
+        proto: ICMP

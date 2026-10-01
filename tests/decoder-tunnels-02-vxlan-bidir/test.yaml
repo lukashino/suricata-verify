@@ -1,0 +1,22 @@
+requires:
+  min-version: 9
+
+args:
+  - --set decoder.vxlan.enabled=true
+
+checks:
+  - filter:
+      count: 1
+      match:
+        event_type: flow
+        proto: UDP
+        src_ip: 10.0.0.1
+        dest_ip: 10.0.0.2
+        tunnel_id: 2
+        flow.pkts_toserver: 1
+        flow.pkts_toclient: 1
+  - filter:
+      count: 0
+      match:
+        event_type: flow
+        src_ip: 10.0.0.2

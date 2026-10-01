@@ -1,0 +1,31 @@
+environment: tap
+
+requires:
+  command:
+    - jq
+    - ping
+    - tcpdump
+
+args:
+  - --af-packet=br0
+  - --runmode workers
+
+client: |
+  set -euo pipefail
+  bash ${TESTDIR}/vxlan-setup.sh
+  ip netns exec client0 ping -c 3 -i 0.2 -W 1 172.16.0.1
+
+checks:
+  - stats:
+      capture.kernel_packets.__gt: 0
+  # inner traffic is inspected and attributed to the tunnel
+  - shell:
+      args: |
+        n=$(jq -c 'select(.event_type == "alert" and .alert.signature_id == 1 and .tunnel_id == 1)' eve.json | wc -l)
+        test "${n}" -ge 1
+  # pcap-log must not be empty on a tunnel interface
+  - shell:
+      args: |
+        n=$(for f in log.pcap*; do tcpdump -nn -r "${f}" 2>/dev/null; done | wc -l)
+        echo "pcap-log packets: ${n}"
+        test "${n}" -gt 0
