@@ -1,0 +1,22 @@
+# Ticket 8991 regression guard (SEQ_LEQ): a future out-of-order segment whose
+# sequence is beyond last_ack must not advance the stream timestamp, even
+# though it carries a high TSval. Otherwise a later in-order request with a
+# lower but valid timestamp would be wrongly rejected. The in-order request
+# must be inspected and no invalid-timestamp event must fire.
+requires:
+  min-version: 9
+
+args:
+  - -k none
+
+checks:
+  - filter:
+      count: 0
+      match:
+        event_type: alert
+        alert.signature_id: 9100002
+  - filter:
+      count: 1
+      match:
+        event_type: http
+        http.url: "/x"

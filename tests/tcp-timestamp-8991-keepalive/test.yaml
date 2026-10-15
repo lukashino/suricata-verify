@@ -1,0 +1,32 @@
+# Ticket 8991: a 1-byte TCP keep-alive at next_seq-1 carries a current
+# timestamp that the endpoint uses to advance TS.Recent. The engine must do
+# the same even though the keep-alive is otherwise skipped, so the stale
+# "/benign-aaaaaa" is rejected and the fresh "/malicious-xxx" the endpoint
+# executes is the one inspected.
+requires:
+  min-version: 9
+
+args:
+  - -k none
+
+checks:
+  - filter:
+      count: 1
+      match:
+        event_type: alert
+        alert.signature_id: 9100001
+  - filter:
+      count: 1
+      match:
+        event_type: http
+        http.url: "/malicious-xxx"
+  - filter:
+      count: 0
+      match:
+        event_type: http
+        http.url: "/benign-aaaaaa"
+  - filter:
+      count: 1
+      match:
+        event_type: alert
+        alert.signature_id: 9100002

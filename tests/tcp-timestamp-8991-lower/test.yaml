@@ -1,0 +1,34 @@
+# Ticket 8991: TCP timestamp (PAWS) desynchronisation / detection bypass.
+#
+# A pure ACK carrying a timestamp lower than the stream's recorded value is
+# sent first. Per RFC 7323 the recorded timestamp (TS.Recent) is only ever
+# moved forward, so this must not lower it; otherwise a later stale-timestamp
+# "/benign-aaaaaa" would pass PAWS. A Linux endpoint keeps the
+# higher value, drops the stale request and executes the fresh "/malicious-xxx".
+requires:
+  min-version: 9
+
+args:
+  - -k none
+
+checks:
+  - filter:
+      count: 1
+      match:
+        event_type: alert
+        alert.signature_id: 9100001
+  - filter:
+      count: 1
+      match:
+        event_type: http
+        http.url: "/malicious-xxx"
+  - filter:
+      count: 0
+      match:
+        event_type: http
+        http.url: "/benign-aaaaaa"
+  - filter:
+      count: 1
+      match:
+        event_type: alert
+        alert.signature_id: 9100002

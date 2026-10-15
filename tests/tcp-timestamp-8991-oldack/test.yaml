@@ -1,0 +1,23 @@
+# Ticket 8991 regression guard: a segment carrying an old (but in-window)
+# acknowledgement must not advance the stream timestamp, because the endpoint
+# does not advance TS.Recent from it. Otherwise a later legitimate request
+# with a lower timestamp that the endpoint still accepts would be wrongly
+# rejected. No invalid-timestamp event must fire and the request must be
+# inspected.
+requires:
+  min-version: 9
+
+args:
+  - -k none
+
+checks:
+  - filter:
+      count: 0
+      match:
+        event_type: alert
+        alert.signature_id: 9100002
+  - filter:
+      count: 1
+      match:
+        event_type: http
+        http.url: "/malicious-xxx"

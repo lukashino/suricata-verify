@@ -1,0 +1,24 @@
+# Ticket 8991 regression guard: in a one-sided (async) capture, last_ack is
+# synthesised from next_seq rather than a real acknowledgement, so a future
+# out-of-order segment carrying a high timestamp must not advance the stream
+# timestamp and make later in-order segments appear to fail PAWS. No
+# invalid-timestamp event must fire and the flow must be inspected.
+requires:
+  min-version: 9
+
+args:
+  - -k none
+  - --set
+  - stream.async-oneside=true
+
+checks:
+  - filter:
+      count: 0
+      match:
+        event_type: alert
+        alert.signature_id: 9100002
+  - filter:
+      count: 1
+      match:
+        event_type: http
+        http.url: "/primer"

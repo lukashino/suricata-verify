@@ -1,0 +1,39 @@
+# Ticket 8991: TCP timestamp (PAWS) desynchronisation / detection bypass.
+#
+# An overlapping segment (starts before the collision seq) carries the fresh TSval.
+# The client advances the endpoint's ts.recent with that segment, then sends
+# "/benign-aaaaaa" with a stale TSval and "/malicious-xxx" with a fresh TSval at
+# the same sequence. A Linux endpoint drops the stale
+# "/benign-aaaaaa" via PAWS and executes "/malicious-xxx". Suricata must do the
+# same, so reject the stale segment with pkt_invalid_timestamp event and inspect
+# the request the endpoint actually ran.
+requires:
+  min-version: 9
+
+args:
+  - -k none
+
+checks:
+  # The request the endpoint executed is inspected.
+  - filter:
+      count: 1
+      match:
+        event_type: alert
+        alert.signature_id: 9100001
+  - filter:
+      count: 1
+      match:
+        event_type: http
+        http.url: "/malicious-xxx"
+  # The request the endpoint discarded via PAWS is not reported.
+  - filter:
+      count: 0
+      match:
+        event_type: http
+        http.url: "/benign-aaaaaa"
+  # The stale segment raises the invalid-timestamp stream event.
+  - filter:
+      count: 1
+      match:
+        event_type: alert
+        alert.signature_id: 9100002
