@@ -1,0 +1,54 @@
+# Unix socket commands must not read the thread store while it is reallocated
+# during startup in offline mode. See README.md.
+environment: tap
+
+requires:
+  min-version: 9
+  features:
+    - ASAN
+  command:
+    - awk
+    - cc
+    - getconf
+    - grep
+    - ldd
+    - python3
+    - timeout
+
+# Only satisfies the live runner: the client runs its own Suricata over a pcap.
+args:
+  - --pcap=br0
+
+# Unix socket paths are limited to 108 bytes, so the socket goes to a short
+# temporary directory. In continuous mode, Suricata keeps running until the
+# client shuts it down. A long delay keeps each command inside the window for
+# nearly all of its run time.
+client: |
+  sockdir=$(mktemp -d /tmp/sv-us.XXXXXX)
+  trap 'rm -rf "${sockdir}"' EXIT
+  mkdir -p "${OUTDIR}/pcaps"
+  cp "${TESTDIR}/../../../tests/alert-testmyids-not-established/input.pcap" "${OUTDIR}/pcaps/"
+  python3 "${TESTDIR}/hostbit-client.py" "${sockdir}/us.s" "${OUTDIR}/pcap-run.log" &
+  client=$!
+  SPIN_DELAY_USEC=5000 bash "${TESTDIR}/../thread-store-realloc-flow-manager/run-pcap.sh" \
+      US "${OUTDIR}/pcaps" \
+      --pcap-file-continuous \
+      --set unix-command.enabled=yes --set unix-command.filename="${sockdir}/us.s"
+  wait "${client}"
+
+checks:
+  # The shim widened the window in the unix socket thread.
+  - shell:
+      args: |
+        grep -F 'spin-delay: delaying pthread_spin_lock in thread US' pcap-run.log
+  - shell:
+      args: |
+        grep -F 'W: 29' pcap-run.log
+  # The client was connected during the startup.
+  - shell:
+      args: |
+        grep -F 'connected before engine start: True' client.stdout
+  - shell:
+      args: grep -F ', 10 after engine start' client.stdout
+  - shell:
+      args: "! grep -F AddressSanitizer pcap-run.log"

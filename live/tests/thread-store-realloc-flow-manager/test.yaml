@@ -1,0 +1,39 @@
+# The flow manager must not read the thread store while it is reallocated
+# during startup in offline mode. See README.md.
+environment: tap
+
+requires:
+  min-version: 9
+  features:
+    - ASAN
+  command:
+    - awk
+    - cc
+    - getconf
+    - grep
+    - ldd
+    - python3
+    - timeout
+
+# Only satisfies the live runner: the client runs its own Suricata over a pcap.
+args:
+  - --pcap=br0
+
+# Each poll of the flow manager locks one store entry and sleeps briefly, so a
+# long delay keeps it inside the window for nearly all of the startup.
+client: |
+  SPIN_DELAY_USEC=20000 bash "${TESTDIR}/run-pcap.sh" FM \
+      "${TESTDIR}/../../../tests/alert-testmyids-not-established/input.pcap"
+
+checks:
+  # The flow manager read the store with the widened window during startup.
+  - shell:
+      args: |
+        awk '/delaying pthread_spin_lock in thread FM#01/ { spin = NR }
+             /Engine started/ { started = NR }
+             END { exit !(spin && started && spin < started) }' pcap-run.log
+  - shell:
+      args: |
+        grep -F 'W: 29' pcap-run.log
+  - shell:
+      args: "! grep -F AddressSanitizer pcap-run.log"
