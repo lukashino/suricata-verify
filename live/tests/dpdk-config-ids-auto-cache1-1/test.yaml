@@ -23,6 +23,12 @@ before: python3 "${TESTDIR}/../dpdk-config/prepare.py" ids 1
 client: ip netns exec client0 ping -c 3 -i 0.2 -W 2 10.200.0.1
 checks:
   - shell:
+      requires:
+        lt-version: 9
+      args: grep -F -- '1 packet mempools of size 31, cache size 1' suricata.log
+  - shell:
+      requires:
+        min-version: 9
       args: grep -F -- '1 packet mempools of size 63, cache size 1' suricata.log
   - stats:
       capture.packets.__gt: 0

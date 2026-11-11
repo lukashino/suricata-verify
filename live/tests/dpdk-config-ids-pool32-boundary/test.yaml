@@ -1,6 +1,8 @@
 # Port of qa/live/dpdk/dpdk-testsuite.sh: IDS: static mempool=32, power-of-two boundary (fail)
+# Suricata 8.0.x still accepts a 32-packet mempool for 16 + 16 descriptors.
 environment: tap
 requires:
+  min-version: 9
   features:
     - DPDK
   command:
