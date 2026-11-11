@@ -22,4 +22,4 @@ before: python3 "${TESTDIR}/../dpdk-config/prepare.py" ids 1
 exit-code: 1
 checks:
   - shell:
-      args: grep -F -- 'mempool size is likely too small' suricata.log
+      args: grep -F -- 'mempool size is too small; set to "auto" or adjust to the value of "127"' suricata.log

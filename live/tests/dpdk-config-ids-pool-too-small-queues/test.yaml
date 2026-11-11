@@ -20,4 +20,10 @@ before: python3 "${TESTDIR}/../dpdk-config/prepare.py" ids 2
 exit-code: 1
 checks:
   - shell:
+      requires:
+        lt-version: 9
       args: grep -F -- 'mempool size is likely too small' suricata.log
+  - shell:
+      requires:
+        min-version: 9
+      args: grep -F -- 'mempool size is too small; set to "auto" or adjust to the value of "255"' suricata.log

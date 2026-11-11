@@ -1,0 +1,26 @@
+# IDS: static mempool=64 yields a 63-packet pool, below the 16 + 16 descriptors plus one
+# 32-packet RX burst that Suricata 9 requires (fail)
+environment: tap
+requires:
+  min-version: 9
+  features:
+    - DPDK
+  command:
+    - python3
+    - grep
+  script:
+    - python3 -c 'import os; assert len(os.sched_getaffinity(0)) >= 2'
+args:
+  - --dpdk
+  - --runmode workers
+  - -v
+  - --include "${OUTDIR}/dpdk.yaml"
+  - -S "${TESTDIR}/../dpdk-config/icmp.rules"
+  - --set dpdk.interfaces.0.threads=1
+  - --set dpdk.interfaces.0.mempool-size=64
+  - --set dpdk.interfaces.0.mempool-cache-size=auto
+before: python3 "${TESTDIR}/../dpdk-config/prepare.py" ids 1
+exit-code: 1
+checks:
+  - shell:
+      args: grep -F -- 'mempool size is too small; set to "auto" or adjust to the value of "127"' suricata.log

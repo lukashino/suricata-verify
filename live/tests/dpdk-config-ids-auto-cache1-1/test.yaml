@@ -29,7 +29,7 @@ checks:
   - shell:
       requires:
         min-version: 9
-      args: grep -F -- '1 packet mempools of size 63, cache size 1' suricata.log
+      args: grep -F -- '1 packet mempools of size 127, cache size 1' suricata.log
   - stats:
       capture.packets.__gt: 0
   - shell:

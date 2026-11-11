@@ -1,6 +1,9 @@
 # Port of qa/live/dpdk/dpdk-testsuite.sh: IDS: static mempool=64, power-of-two boundary (1 thread)
+# Suricata 9 reserves an RX burst on top of the descriptors, so 64 is too small there:
+# see dpdk-config-ids-pool64-too-small.
 environment: tap
 requires:
+  lt-version: 9
   features:
     - DPDK
   command:
